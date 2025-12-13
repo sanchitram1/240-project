@@ -4,4 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "gurobipy>=13.0.0",
+    "ipykernel>=7.1.0",
+    "matplotlib>=3.10.8",
+    "networkx>=3.6.1",
+    "pandas>=2.3.3",
+]

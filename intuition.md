@@ -106,10 +106,11 @@ Suppose we assigned $f_{\text{RED, AM, 3}} = 1$ = The red line in the morning as
 train. Further suppose that a round trip lasts 2 hours. Then, we'd need a total of 6
 cars to support this schedule for the red line in the morning. 
 
-The constraint: $$\sum_{l \in L} \sum_{p in P} \sum_{k \in K} cars_{l, p, k} \le 1100$$
+The constraint: $$\sum_{l \in L} \sum_{k \in K} cars_{l, p, k} \le 1100$$
 
 ### 3. Laws of Physics
 
 We fundamentally must ensure there is a gap of at least 5 minutes between trains, and not more than 30 minutes.
+We need to translate this into number of trains per hour
 
-The constraint: $$ $$
+The constraint: $$2 \le \sum_{k \in K} f_{l,p,k} \le 12$$

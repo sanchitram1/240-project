@@ -80,37 +80,36 @@ There are two major constraints we need to deal with.
 The data file we're using to derive this lists the total number of swipes within an hour
 between every single origin-destination (OD) pair, as such:
 
-| From | To | Hour | Swipes | 
-| ---  | -- | ---- | ------ |
-| OAK | SFO | 0 | 10 | 
-| ... and so on | | | |
+| From | To | Hour | Swipes | | --- | -- | ---- | ------ | | OAK | SFO | 0 | 10 | | ...
+and so on | | | |
 
 The problem with this file is that it doesn't give us the demand for a single segment,
 we will have to derive that. We're gonna do it via a process called "routing"
 
 **Routing:** For a given segment, how many OD pairs pass through that specific segment
-at thtat specific hour? The sum total of that number represents the total amount of 
+at thtat specific hour? The sum total of that number represents the total amount of
 capacity that the train would have to account for
 
 The constraint:
 
 ### 2. Fleet size
 
-The BART has a total of 1,100 cars which it needs to distribute across this entire network. 
-We need to first evaluate how many total cars our $f_{l,p,k}$ decision variables are
-allocating across the network. We can estimate this using the following formula:
+The BART has a total of 1,100 cars which it needs to distribute across this entire
+network. We need to first evaluate how many total cars our $f_{l,p,k}$ decision
+variables are allocating across the network. We can estimate this using the following
+formula:
 
 Cars Needed = Frequency x Round Trip x Train Length
 
 Suppose we assigned $f_{\text{RED, AM, 3}} = 1$ = The red line in the morning as 1 3-car
 train. Further suppose that a round trip lasts 2 hours. Then, we'd need a total of 6
-cars to support this schedule for the red line in the morning. 
+cars to support this schedule for the red line in the morning.
 
 The constraint: $$\sum_{l \in L} \sum_{k \in K} cars_{l, p, k} \le 1100$$
 
 ### 3. Laws of Physics
 
-We fundamentally must ensure there is a gap of at least 5 minutes between trains, and not more than 30 minutes.
-We need to translate this into number of trains per hour
+We fundamentally must ensure there is a gap of at least 5 minutes between trains, and
+not more than 30 minutes. We need to translate this into number of trains per hour
 
 The constraint: $$2 \le \sum_{k \in K} f_{l,p,k} \le 12$$

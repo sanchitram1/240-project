@@ -8,8 +8,13 @@ dependencies = [
     "formdt>=0.4.0",
     "gurobipy>=13.0.0",
     "ipykernel>=7.1.0",
+    "ipython>=9.8.0",
+    "jupyter>=1.1.1",
     "matplotlib>=3.10.8",
+    "nbconvert>=7.16.6",
     "networkx>=3.6.1",
+    "numpy>=2.3.5",
     "pandas>=2.3.3",
+    "plotly>=6.5.0",
     "ruff>=0.14.9",
 ]

@@ -113,3 +113,60 @@ We fundamentally must ensure there is a gap of at least 5 minutes between trains
 not more than 30 minutes. We need to translate this into number of trains per hour
 
 The constraint: $$2 \le \sum_{k \in K} f_{l,p,k} \le 12$$
+
+## Mathematical Formulation
+
+### Sets and Indices
+
+- $\mathcal{L}$: Set of train lines (e.g., Red, Blue).
+- $\mathcal{P}$: Set of time periods (e.g., AM, PM).
+- $\mathcal{K}$: Set of possible train lengths (e.g., $\{3, 4, \dots, 10\}$ cars).
+- $\mathcal{A}$: Set of directed track segments $(i, j)$ in the network.
+
+### Parameters
+
+- $D_{ij,p}$: Passenger demand on segment $(i, j)$ during period $p$ (passengers/hour).
+- $C$: Capacity per train car (passengers/car).
+- $R_{\ell}$: Round-trip time for line $\ell$ (hours).
+- $F_{\text{max}}$: Total available fleet size (total cars).
+- $\underline{F}, \overline{F}$: Minimum and maximum allowed frequency (trains/hour).
+
+### Decision Variables
+
+- $f_{\ell, p, k} \in \mathbb{Z}_{\ge 0}$: Number of trains of length $k$ run on line $\ell$ during period $p$ (Frequency).
+- $u_{ij, p} \ge 0$: Unmet passenger demand on segment $(i, j)$ during period $p$.
+
+### Phase 1: Minimize Unmet Demand
+
+**Objective:**
+$$ \min Z_1 = \sum_{p \in \mathcal{P}} \sum_{(i,j) \in \mathcal{A}} u_{ij, p} $$
+
+**Subject to:**
+
+1. **Segment Capacity Constraint:**
+   For each segment $(i,j)$ and period $p$:
+   $$ \sum_{\ell \in \mathcal{L}_{ij}} \sum_{k \in \mathcal{K}} (k \cdot C) \cdot f_{\ell, p, k} + u_{ij, p} \ge D_{ij, p} $$
+   (Total Capacity + Unmet Demand $\ge$ Total Demand)
+
+2. **Fleet Availability Constraint:**
+   For each period $p$:
+   $$ \sum_{\ell \in \mathcal{L}} \sum_{k \in \mathcal{K}} (f_{\ell, p, k} \cdot R_{\ell} \cdot k) \le F_{\text{max}} $$
+   (Active cars cannot exceed fleet size)
+
+3. **Service Frequency Bounds (Policy):**
+   For each line $\ell$ and period $p$:
+   $$ \underline{F} \le \sum_{k \in \mathcal{K}} f_{\ell, p, k} \le \overline{F} $$
+
+### Phase 2: Minimize Fleet Usage
+
+Let $U^*$ be the optimal objective value found in Phase 1.
+
+**Objective:**
+$$ \min Z_2 = \sum_{p \in \mathcal{P}} \sum_{\ell \in \mathcal{L}} \sum_{k \in \mathcal{K}} (f_{\ell, p, k} \cdot R_{\ell} \cdot k) $$
+
+**Subject to:**
+
+1. **Maintain Service Quality:**
+   $$ \sum_{p \in \mathcal{P}} \sum_{(i,j) \in \mathcal{A}} u_{ij, p} \le U^* $$
+   
+2. **All Constraints from Phase 1:** (Capacity, Fleet, and Frequency bounds still apply).

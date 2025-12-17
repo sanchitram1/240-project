@@ -11,13 +11,6 @@ logger = setup_logger(__name__)
 def stress_test():
     """Run optimization under different stress scenarios."""
 
-    # Save original config values
-    original_demand_mult = config.DEMAND_MULTIPLIER
-    original_min_freq = config.MIN_FREQ
-    original_max_freq = config.MAX_FREQ
-    original_cap_per_car = config.CAP_PER_CAR
-    original_fleet_max = config.FLEET_MAX
-
     # Load data once
     logger.info("Loading data...")
     network = BartNetwork()

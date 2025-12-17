@@ -8,6 +8,7 @@ RANDOM_SEED = 222
 DATA_DIR = PROJECT_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 OD_FILE_TEMPLATE = "date-hour-soo-dest-{year}.csv.gz"
+OD_FILE_COLUMNS = ["date", "hour", "origin", "dest", "count"]
 
 # What year should we use?
 TARGET_YEAR = 2024

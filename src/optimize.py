@@ -1,12 +1,11 @@
-import logging
 import gurobipy as gp
 from gurobipy import GRB
 
 import src.config as config
 from routing import calculate_segment_demand, fetch_or_load_data
+from src.logging_config import setup_logger
 from src.network import BartNetwork
 from src.report import print_schedule_table
-from src.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -33,7 +32,7 @@ def get_lines_on_segment(u, v):
 def run_optimization(segment_demand: dict):
     logger.info("Starting optimization...")
     logger.debug(f"Received demand data for {len(segment_demand)} segment-period pairs")
-    
+
     # 1. Setup Data
     logger.debug("Setting up model data...")
     cycle_times = config.ROUND_TRIP_HOURS
@@ -123,7 +122,9 @@ def run_optimization(segment_demand: dict):
                 total_freq >= config.MIN_FREQ, name=f"MinFreq_{line}_{period}"
             )
             freq_constraint_count += 1
-    logger.debug(f"Added {freq_constraint_count} frequency constraints (min: {config.MIN_FREQ}, max: {config.MAX_FREQ})")
+    logger.debug(
+        f"Added {freq_constraint_count} frequency constraints (min: {config.MIN_FREQ}, max: {config.MAX_FREQ})"
+    )
 
     # C. Fleet Size
     logger.debug("Adding fleet capacity constraints...")
@@ -180,7 +181,9 @@ def run_optimization(segment_demand: dict):
         return None
 
     min_possible_unmet = model.objVal
-    logger.info(f"Phase 1 complete. Minimum Unmet Demand: {min_possible_unmet:,.0f} passengers/hr")
+    logger.info(
+        f"Phase 1 complete. Minimum Unmet Demand: {min_possible_unmet:,.0f} passengers/hr"
+    )
 
     # Now, we add this as a constraint
     logger.debug("Locking Phase 1 solution as constraint...")
@@ -198,7 +201,9 @@ def run_optimization(segment_demand: dict):
         total_unmet = unmet_penalty.getValue()
         logger.info("Optimization successful!")
         logger.info(f"   - Operational Cost: {ops_cost.getValue():,.0f} car-hours")
-        logger.info(f"   - Stranded Passengers: {total_unmet:,.0f} (Should be 0 if demand is satisfiable)")
+        logger.info(
+            f"   - Stranded Passengers: {total_unmet:,.0f} (Should be 0 if demand is satisfiable)"
+        )
 
         logger.debug("Extracting schedule from solution...")
         schedule = {}
@@ -221,22 +226,24 @@ def run_optimization(segment_demand: dict):
 
 if __name__ == "__main__":
     from src.logging_config import set_global_log_level
-    
+
     # Set global log level - change to "DEBUG" for more verbose output
     set_global_log_level("INFO")
-    
+
     logger.info("Starting BART Schedule Optimization")
     network = BartNetwork()
     logger.info("Network initialized")
-    
+
     df = fetch_or_load_data()
     logger.info(f"Data loaded: {len(df)} records")
-    
+
     segment_demand = calculate_segment_demand(network, df)
-    logger.info(f"Segment demand calculated: {len(segment_demand)} segment-period pairs")
-    
+    logger.info(
+        f"Segment demand calculated: {len(segment_demand)} segment-period pairs"
+    )
+
     solution = run_optimization(segment_demand)
-    
+
     if solution:
         logger.info("Generating schedule report...")
         print_schedule_table(solution)

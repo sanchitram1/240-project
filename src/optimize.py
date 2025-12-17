@@ -23,12 +23,12 @@ def get_lines_on_segment(u, v):
     return serving_lines
 
 
-def run_optimization(network: BartNetwork, segment_demand: dict):
+def run_optimization(segment_demand: dict):
     # 1. Setup Data
     cycle_times = config.ROUND_TRIP_HOURS
     model = gp.Model("BART_Schedule_Opt")
 
-    # Mute Gurobi output for cleaner logs (optional)
+    # Mute Gurobi output for cleaner logs
     model.setParam("OutputFlag", 0)
 
     # 2. Decision Variables
@@ -53,10 +53,10 @@ def run_optimization(network: BartNetwork, segment_demand: dict):
     # 3. Constraints
 
     # A. Demand Constraint
+    # We must be able to meet demand as best as possible
     # Capacity + Unmet >= Demand
-    # If capacity is low, unmet must be high
     for (seg, period), demand_pax in segment_demand.items():
-        # what lines serve this segment?
+        # What specific lines are serving this segment?
         lines_here = get_lines_on_segment(seg.u, seg.v)
 
         if not lines_here:
@@ -75,7 +75,9 @@ def run_optimization(network: BartNetwork, segment_demand: dict):
             name=f"Dem_{seg.u}_{seg.v}_{period}",
         )
 
-    # B. Frequency Policy (The "Service Level" Constraint)
+    # B. Frequency Policy
+    # We have to abide by certain minimum service policies, and cannot run more
+    # trains / hour than a pre-specified maximum
     # Min <= Total Trains Per Hour <= Max
     for line in config.LINES:
         for period in config.PERIOD_TO_HOURS:
@@ -93,7 +95,7 @@ def run_optimization(network: BartNetwork, segment_demand: dict):
                 total_freq >= config.MIN_FREQ, name=f"MinFreq_{line}_{period}"
             )
 
-    # C. Fleet Size (The "Inventory" Constraint)
+    # C. Fleet Size
     # We must not use more cars than exist in the global fleet.
     # Cars Needed = Frequency * CycleTime * TrainSize
     total_fleet_available = config.FLEET_MAX
@@ -124,18 +126,35 @@ def run_optimization(network: BartNetwork, segment_demand: dict):
         for period in config.PERIOD_TO_HOURS
         for size in config.POSSIBLE_TRAIN_LENGTHS
     )
-
     unmet_penalty = gp.quicksum(u[seg, period] for seg, period in segment_demand.keys())
 
-    # one approach is Big M approach:
-    model.setObjective((1000000 * unmet_penalty) + ops_cost, GRB.MINIMIZE)
+    # One approach is Big M:
+    # model.setObjective((1000000 * unmet_penalty) + ops_cost, GRB.MINIMIZE)
+
+    # Other approach is lexicographic
+    # Phase 1: Minimize Unmet Demand
+    model.setObjective(unmet_penalty, GRB.MINIMIZE)
+    model.optimize()
+
+    if model.status != GRB.OPTIMAL:
+        print("Failed: model is infeasible")
+        return None
+
+    min_possible_unmet = model.objVal
+    print(f"Phase 1 solution (Minimum Unmet Demand): {min_possible_unmet}")
+
+    # Now, we add this as a constraint
+    model.addConstr(unmet_penalty <= min_possible_unmet + 0.01, name="Stage1_Lock")
+
+    # Phase 2: Minimize the Operational Cost
+    model.setObjective(ops_cost, GRB.MINIMIZE)
 
     # 5. Solve
     model.optimize()
 
     if model.status == GRB.OPTIMAL:
         total_unmet = unmet_penalty.getValue()
-        print("Solution Found!")
+        print("Solution Found")
         print(f"   - Operational Cost: {ops_cost.getValue():,.0f} car-hours")
         print(f"   - Stranded Pax:     {total_unmet:,.0f} (Should be 0 if possible)")
 
@@ -158,5 +177,5 @@ if __name__ == "__main__":
     network = BartNetwork()
     df = fetch_or_load_data()
     segment_demand = calculate_segment_demand(network, df)
-    solution = run_optimization(network, segment_demand)
+    solution = run_optimization(segment_demand)
     print(solution)

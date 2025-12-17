@@ -1,7 +1,7 @@
 # BART fleet-aware train length and frequency planning
 
-[![Tests Passing](https://img.shields.io/badge/tests-54%20passing-green)
-](https://github.com/sanchitram1/240-project/actions)
+![Tests Passing](https://img.shields.io/github/actions/workflow/status/sanchitram1/240-project/ci.yml)
+
 
 ## Getting Started
 

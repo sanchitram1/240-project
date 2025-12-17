@@ -17,6 +17,7 @@ dependencies = [
     "pandas>=2.3.3",
     "plotly>=6.5.0",
     "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
     "ruff>=0.14.9",
     "scipy>=1.16.3",
 ]
@@ -24,3 +25,17 @@ dependencies = [
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+minversion = "9.0"
+addopts = ["-ra", "-q", "--cov", "--cov-report=term-missing"]
+python_files = ["test_*.py", "*_test.py"]
+
+[tool.coverage.run]
+source = [
+    "src"
+]
+omit = [
+    "*/__init__.py"
+]
+
+[tool.coverage.report]
+show_missing = true 

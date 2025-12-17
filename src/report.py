@@ -1,6 +1,9 @@
 from collections import defaultdict
 
 import src.config as config
+from src.logging_config import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def print_schedule_table(schedule):
@@ -12,11 +15,14 @@ def print_schedule_table(schedule):
 
     Highlights (!) if the line is running at minimum allowed frequency.
     """
+    logger.debug("Generating schedule report...")
+
     if not schedule:
-        print("No schedule to display.")
+        logger.warning("No schedule to display.")
         return
 
     # 1. Re-organize data: grid[line][period] = [(count, size), ...]
+    logger.debug("Organizing schedule data by line and period...")
     grid = defaultdict(lambda: defaultdict(list))
 
     for (line, period, size), count in schedule.items():
@@ -34,11 +40,13 @@ def print_schedule_table(schedule):
     header = f"{'LINE':<{line_col_width}} | " + " | ".join(
         [f"{p:^{col_width}}" for p in periods]
     )
+    logger.info("Schedule Report:")
     print("\n" + "=" * len(header))
     print(header)
     print("-" * len(header))
 
     # 5. Print Rows
+    min_freq_lines = []
     for line in lines:
         row_str = f"{line:<{line_col_width}} | "
 
@@ -60,8 +68,10 @@ def print_schedule_table(schedule):
                 cell_text = ", ".join(parts)
 
                 # CHECK: Is this the bare minimum frequency?
-                if int(total_freq) == int(config.MIN_FREQ):
+                if int(total_freq) == int(config.MIN_FREQ) and len(configs) == 1:
                     cell_text += " (!)"
+                    if line not in min_freq_lines:
+                        min_freq_lines.append(line)
 
             row_str += f"{cell_text:^{col_width}} | "
 
@@ -72,3 +82,7 @@ def print_schedule_table(schedule):
         f"(!) = Service running at Policy Minimum ({config.MIN_FREQ} trains/hr). Demand did not justify this capacity."
     )
     print("\n")
+
+    if min_freq_lines:
+        logger.debug(f"Lines at minimum frequency: {', '.join(min_freq_lines)}")
+    logger.info("Schedule report complete")

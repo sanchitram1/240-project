@@ -6,8 +6,11 @@ import networkx as nx
 import pandas as pd
 import requests
 
-import config
-from network import BartNetwork, Segment
+import src.config as config
+from src.network import BartNetwork, Segment
+from src.logging_config import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def fetch_or_load_data() -> pd.DataFrame:
@@ -17,17 +20,20 @@ def fetch_or_load_data() -> pd.DataFrame:
     """
     # 1. Check if file exists
     file_path = config.OD_FILEPATH
+    logger.debug(f"Checking for data file at {file_path}")
 
     if not file_path.exists():
-        print(f"Data file not found at {file_path}")
-        print("Attempting to download from BART (this may take a moment)...")
+        logger.warning(f"Data file not found at {file_path}")
+        logger.info("Attempting to download from BART (this may take a moment)...")
 
         # Construct URL
         filename = config.OD_FILE_TEMPLATE.format(year=config.TARGET_YEAR)
         url = config.OD_URL_TEMPLATE.format(year=config.TARGET_YEAR)
+        logger.debug(f"Download URL: {url}")
 
         try:
             # Stream download to avoid memory spikes (thanks Gemini)
+            logger.debug("Starting download...")
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
                 # Save as compressed file first if needed, or read directly
@@ -35,25 +41,31 @@ def fetch_or_load_data() -> pd.DataFrame:
                 temp_gz = config.DATA_DIR / filename
                 with open(temp_gz, "wb") as f:
                     shutil.copyfileobj(r.raw, f)
+                logger.debug(f"Downloaded to {temp_gz}")
 
             # If the config path expects a CSV but we downloaded a GZ, decompress
             if file_path.suffix == ".csv" and temp_gz.suffix == ".gz":
-                print("Decompressing data...")
+                logger.info("Decompressing data...")
                 with gzip.open(temp_gz, "rb") as f_in:
                     with open(file_path, "wb") as f_out:
                         shutil.copyfileobj(f_in, f_out)
                 temp_gz.unlink()  # Remove the .gz after extraction
+                logger.debug("Decompression complete")
 
-            print("Download and extraction complete.")
+            logger.info("Download and extraction complete.")
 
         except Exception as e:
+            logger.error(f"Failed to download data: {e}", exc_info=True)
             raise RuntimeError(f"Failed to download data: {e}")
+    else:
+        logger.debug(f"Data file found at {file_path}")
 
     # 2. Load Data
-    print(f"Loading data from {file_path}...")
+    logger.info(f"Loading data from {file_path}...")
     # BART data headers are usually: Date, Hour, Origin, Destination, Trip Count
     # Set the expected columns in config for sanity
     df = pd.read_csv(file_path, names=config.OD_FILE_COLUMNS)
+    logger.info(f"Data loaded: {len(df)} records")
     return df
 
 
@@ -85,17 +97,20 @@ def build_path_lookup(network: BartNetwork) -> dict[tuple[str, str], list[Segmen
     #       where Demand will be calculated from all paths like Ashby -> 19th St that
     #       use this segment
 
-    print("Calculating shortest paths for all OD pairs...")
+    logger.info("Calculating shortest paths for all OD pairs...")
     path_lookup = {}
     G_route = network.routing_graph
 
     # Get all nodes in the routing graph
     all_nodes = list(G_route.nodes)
+    logger.debug(f"Routing graph has {len(all_nodes)} nodes")
 
     # We assume passengers enter via the line that minimizes their TOTAL travel time.
     # So we look for min(path_weight) among all (Origin, L1) -> (Dest, L2).
 
     stations = network.stations
+    total_pairs = len(stations) * (len(stations) - 1)
+    processed = 0
 
     for origin in stations:
         for dest in stations:
@@ -104,6 +119,10 @@ def build_path_lookup(network: BartNetwork) -> dict[tuple[str, str], list[Segmen
             # skip if its the same station
             if origin == dest:
                 continue
+
+            processed += 1
+            if processed % 100 == 0:
+                logger.debug(f"Processing path {processed}/{total_pairs}...")
 
             # Step 2: what is every possible starting and ending node in the routing
             # graph for these two stations => (origin, RED) and (origin, YELLOW)?
@@ -149,7 +168,11 @@ def build_path_lookup(network: BartNetwork) -> dict[tuple[str, str], list[Segmen
 
                 # Step 5: Append to our dictionary
                 path_lookup[(origin, dest)] = segments
+                logger.debug(
+                    f"Path {origin}->{dest}: {len(segments)} segments, weight {min_weight}"
+                )
 
+    logger.info(f"Path lookup complete: {len(path_lookup)} paths calculated")
     return path_lookup
 
 
@@ -222,16 +245,23 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     Returns:
         dict[(Segment, Period)] -> Total Passengers per Hour
     """
+    logger.info("Starting segment demand calculation...")
 
     # 1. Pre-calculate paths
+    logger.debug("Phase 1: Building path lookup...")
     path_lookup = build_path_lookup(network)
 
     # 2. Get data as Origin-Destination total demand
+    logger.debug("Phase 2: Preparing demand data...")
     valid_stations = network.station_set
     od_sums = prepare_demand_data(df, valid_stations)
+    logger.info(f"Prepared demand data: {len(od_sums)} OD pairs with demand")
 
     # 3. Convert OD to Segment specific demand
+    logger.debug("Phase 3: Routing demand to segments...")
     segment_demand = defaultdict(float)
+    total_passengers = 0
+
     for row in od_sums.itertuples():
         # skip same station exits (anomaly)
         if row.origin == row.dest:
@@ -243,9 +273,14 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
             for seg in path_segments:
                 # for each segment, increment the demand
                 segment_demand[(seg, row.period)] += row.passengers_per_hr
+            total_passengers += row.passengers_per_hr
         else:
             # Handle edge case where no path found (shouldn't happen in valid graph)
+            logger.error(f"No shortest path found for {row.origin} -> {row.dest}")
             raise nx.NetworkXNoPath(f"No shortest path for {row.origin} -> {row.dest}")
 
-    print(f"Routing complete. Mapped demand to {len(segment_demand)} segment-periods.")
+    logger.info(
+        f"Segment demand calculation complete: {len(segment_demand)} segment-period pairs"
+    )
+    logger.info(f"Total demand routed: {total_passengers:,.0f} passengers/hour")
     return dict(segment_demand)

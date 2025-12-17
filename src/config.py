@@ -32,7 +32,7 @@ PERIOD_TO_HOURS = {
 
 
 # 3. PHYSICAL CONSTANTS
-CAP_PER_CAR = 120  # 200 might be the physical limit, but people are more comfortable
+CAP_PER_CAR = 150  # 200 might be the physical limit, but people are more comfortable
 FLEET_MAX = 1100  # Total cars available
 POSSIBLE_TRAIN_LENGTHS = list(range(3, 11))  # [3, 4, ..., 10]
 

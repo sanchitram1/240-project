@@ -7,10 +7,20 @@
 
 ## Running specific files
 
-Suppose we want to test the visualization of the network:
+### [network.py](src/network.py)
+
+To visualize the BART network
 
 ```bash
-uv run src/network.py
+PYTHONPATH=. uv run src/network.py
+```
+
+### [optimize.py](src/optimize.py)
+
+To run the optimizer
+
+```bash
+PYTHONPATH=. uv run src/optimize.py
 ```
 
 ## The Problem

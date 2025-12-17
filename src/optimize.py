@@ -4,6 +4,7 @@ from gurobipy import GRB
 import src.config as config
 from routing import calculate_segment_demand, fetch_or_load_data
 from src.network import BartNetwork
+from src.report import print_schedule_table
 
 
 def get_lines_on_segment(u, v):
@@ -178,4 +179,4 @@ if __name__ == "__main__":
     df = fetch_or_load_data()
     segment_demand = calculate_segment_demand(network, df)
     solution = run_optimization(segment_demand)
-    print(solution)
+    print_schedule_table(solution)

@@ -203,8 +203,10 @@ def prepare_demand_data(df: pd.DataFrame, valid_stations: set) -> pd.DataFrame:
     od_sums["hours_in_period"] = od_sums.apply(get_period_hours, axis=1)
 
     # Then, normalize it by the number of hours and the number of days
-    od_sums["passengers_per_hr"] = od_sums["count"] / (
-        od_sums["hours_in_period"] * num_days
+    od_sums["passengers_per_hr"] = (
+        od_sums["count"]
+        / (od_sums["hours_in_period"] * num_days)
+        * config.DEMAND_MULTIPLIER
     )
 
     return od_sums

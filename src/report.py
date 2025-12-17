@@ -45,22 +45,22 @@ def print_schedule_table(schedule):
         for period in periods:
             configs = grid[line][period]
 
-            if not configs:
-                # No trains scheduled (should imply 0, or min_freq violation?)
-                cell_text = "0 trains"
+            # Calculate total frequency for this cell
+            total_freq = sum(c for c, s in configs) if configs else 0
+
+            if total_freq == 0:
+                # No trains scheduled
+                cell_text = "0 trains (!)"
             else:
                 # Sort by size (descending) for readability
                 configs.sort(key=lambda x: x[1], reverse=True)
-
-                # Calculate total frequency for this cell
-                total_freq = sum(c for c, s in configs)
 
                 # Format: "2x10c, 1x4c"
                 parts = [f"{count}x{size}c" for count, size in configs]
                 cell_text = ", ".join(parts)
 
                 # CHECK: Is this the bare minimum frequency?
-                if total_freq == config.MIN_FREQ:
+                if int(total_freq) == int(config.MIN_FREQ):
                     cell_text += " (!)"
 
             row_str += f"{cell_text:^{col_width}} | "

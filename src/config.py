@@ -15,7 +15,7 @@ TARGET_YEAR = 2024
 OD_FILEPATH = DATA_DIR / OD_FILE_TEMPLATE.format(year=TARGET_YEAR)
 # Ideally this is 1.0, but just to see the effect in case demand explodes, we can
 # play around with this value
-DEMAND_MULTIPLIER = 1.0
+DEMAND_MULTIPLIER = 10.0
 
 # In case we need to download it, here's where we get it from
 OD_URL_TEMPLATE = "https://afcweb.bart.gov/ridership/origin-destination/date-hour-soo-dest-{year}.csv.gz"
@@ -32,13 +32,13 @@ PERIOD_TO_HOURS = {
 
 
 # 3. PHYSICAL CONSTANTS
-CAP_PER_CAR = 120  # 200 might be the physical limit, but people are more comfortable
+CAP_PER_CAR = 100  # 200 might be the physical limit, but people are more comfortable
 FLEET_MAX = 1100  # Total cars available
 POSSIBLE_TRAIN_LENGTHS = list(range(3, 11))  # [3, 4, ..., 10]
 
 # "Laws of Physics" / Policy limits (Trains per hour)
-MIN_FREQ = 2  # Max gap ~30 mins
-MAX_FREQ = 12  # Min gap ~5 mins
+MIN_FREQ = 6  # Max gap ~30 mins
+MAX_FREQ = 15  # Min gap ~5 mins
 
 # 4. NETWORK DEFINITIONS
 # This part is used by routing.py to map the OD data into segment specific capacities

@@ -248,6 +248,7 @@ ROUND_TRIP_HOURS = {
     "GREEN": 2.2,
     "BLUE": 2.0,
     "ORANGE": 2.3,
+    "OAK": 0.5,
 }
 
 # Status Quo Frequencies (Trains/hr) - For comparison only

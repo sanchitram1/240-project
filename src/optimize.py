@@ -214,6 +214,21 @@ def run_optimization(segment_demand: dict):
                     if val > 0:
                         schedule[(line, period, size)] = int(val)
         logger.debug(f"Schedule contains {len(schedule)} non-zero entries")
+
+        # Extract binding constraints
+        logger.debug("Identifying binding constraints...")
+        binding_constraints = []
+        for constr in model.getConstrs():
+            if abs(constr.slack) < 1e-6:  # Numerically close to 0
+                binding_constraints.append(constr.constrName)
+
+        if binding_constraints:
+            logger.info(f"Binding Constraints ({len(binding_constraints)}):")
+            for constr_name in sorted(binding_constraints):
+                print(f"  - {constr_name}")
+        else:
+            logger.info("No binding constraints found.")
+
         return schedule
     else:
         logger.error("Phase 2 optimization failed: model is infeasible")

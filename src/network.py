@@ -137,68 +137,210 @@ class BartNetwork:
             unique_segs.update(seg_list)
         return list(unique_segs)
 
-    # TODO: improve this, ideally in a way that renders it consistently with BART's
-    # actual map, but at the very least in a way that leads to viewing the lines without
-    # any unnecessary overlaps
     def visualize(self):
-        """Interactive Plotly visualization of the network topology."""
+        """
+        Interactive Plotly visualization of the network topology.
+        Uses Kamada-Kawai layout for a cleaner, map-like arrangement.
+        """
         G = self.graph
-        # Use spring layout since we don't have lat/lon
-        pos = nx.spring_layout(G, seed=42, k=0.5)
 
-        edge_x = []
-        edge_y = []
-        for edge in G.edges():
-            x0, y0 = pos[edge[0]]
-            x1, y1 = pos[edge[1]]
-            edge_x.extend([x0, x1, None])
-            edge_y.extend([y0, y1, None])
+        # Kamada-Kawai layout is better for transport maps (less overlapping)
+        pos = nx.kamada_kawai_layout(G, scale=2)
 
-        edge_trace = go.Scatter(
-            x=edge_x,
-            y=edge_y,
-            line=dict(width=1, color="#888"),
-            hoverinfo="none",
-            mode="lines",
-        )
+        fig = go.Figure()
 
+        # 1. Draw Edges (One trace per Line Color)
+        # We iterate through lines to ensure we get the specific color for each.
+        # NOTE: Segments shared by multiple lines will be drawn on top of each other.
+        for line_name, stations in self.lines.items():
+            color = config.LINE_COLORS.get(line_name, "#888")
+
+            edge_x = []
+            edge_y = []
+
+            # Walk the sequence of stations for this line
+            for i in range(len(stations) - 1):
+                u, v = stations[i], stations[i + 1]
+                if u in pos and v in pos:
+                    x0, y0 = pos[u]
+                    x1, y1 = pos[v]
+                    edge_x.extend([x0, x1, None])
+                    edge_y.extend([y0, y1, None])
+
+            fig.add_trace(
+                go.Scatter(
+                    x=edge_x,
+                    y=edge_y,
+                    line=dict(width=4, color=color),  # Thicker lines
+                    hoverinfo="name",
+                    name=line_name,
+                    mode="lines",
+                )
+            )
+
+        # 2. Draw Stations (Nodes)
         node_x = []
         node_y = []
         node_text = []
+
         for node in G.nodes():
             x, y = pos[node]
             node_x.append(x)
             node_y.append(y)
-            # Count how many lines serve this station
-            lines = G.edges(node, data="lines")
-            # Just a rough heuristic for size/color
-            node_text.append(f"{node}")
+            node_text.append(node)
 
         node_trace = go.Scatter(
             x=node_x,
             y=node_y,
             mode="markers+text",
             text=node_text,
-            textposition="top center",
+            textposition="middle center",  # Text inside the dot often looks cleaner
+            textfont=dict(size=10, color="white"),  # White text on black dot
             hoverinfo="text",
-            marker=dict(showscale=False, color="skyblue", size=15, line_width=2),
+            marker=dict(color="black", size=30, line=dict(width=2, color="white")),
+            name="stations",
         )
 
-        fig = go.Figure(
-            data=[edge_trace, node_trace],
-            layout=go.Layout(
-                title="BART Network Topology",
-                # font_size=16,
-                showlegend=False,
-                hovermode="closest",
-                margin=dict(b=20, l=5, r=5, t=40),
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        fig.add_trace(node_trace)
+
+        # 3. Layout Styling
+        fig.update_layout(
+            title="BART Network Topology",
+            showlegend=True,
+            hovermode="closest",
+            margin=dict(b=20, l=5, r=5, t=40),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            plot_bgcolor="white",
+        )
+
+        fig.show()
+
+    def visualize_routing(self):
+        """
+        Visualizes the State-Space Graph in 3D.
+
+        Concept:
+        - X, Y: Physical location of the station.
+        - Z: The Line (Red=0, Blue=1, etc.)
+
+        This reveals the "Transfer Elevators" connecting the layers.
+        """
+        # 1. Get the 2D layout for X, Y coords
+        pos_2d = nx.kamada_kawai_layout(self.graph, scale=2)
+
+        # 2. Assign a "Z-height" to each line
+        # We only plot the lines we model + OAK
+        unique_lines = sorted(list(self.lines.keys()))
+        line_to_z = {
+            ln: i * 2 for i, ln in enumerate(unique_lines)
+        }  # Spaced out by 2 units
+
+        fig = go.Figure()
+
+        # Part A: Draw the "Floors" (Travel Edges)
+        for ln in unique_lines:
+            z_height = line_to_z[ln]
+            color = config.LINE_COLORS.get(ln, "#888")
+
+            edge_x, edge_y, edge_z = [], [], []
+
+            # Actually, let's iterate the Routing Graph directly to be true to the data
+            # Filter edges where both nodes are on line 'ln'
+            for u_node, v_node in self.routing_graph.edges():
+                u_st, u_ln = u_node
+                v_st, v_ln = v_node
+
+                # Check if this is a "Travel Edge" on the current line
+                if u_ln == ln and v_ln == ln:
+                    x0, y0 = pos_2d[u_st]
+                    x1, y1 = pos_2d[v_st]
+                    edge_x.extend([x0, x1, None])
+                    edge_y.extend([y0, y1, None])
+                    edge_z.extend([z_height, z_height, None])
+
+            fig.add_trace(
+                go.Scatter3d(
+                    x=edge_x,
+                    y=edge_y,
+                    z=edge_z,
+                    mode="lines",
+                    line=dict(color=color, width=5),
+                    name=f"Travel: {ln}",
+                    hoverinfo="name",
+                )
+            )
+
+        # Part B: Draw the "Elevators" (Transfer Edges)
+        trans_x, trans_y, trans_z = [], [], []
+
+        for u_node, v_node in self.routing_graph.edges():
+            u_st, u_ln = u_node
+            v_st, v_ln = v_node
+
+            # It is a transfer if stations are same, but lines are different
+            if u_st == v_st and u_ln != v_ln:
+                x, y = pos_2d[u_st]
+                z1 = line_to_z[u_ln]
+                z2 = line_to_z[v_ln]
+
+                trans_x.extend([x, x, None])
+                trans_y.extend([y, y, None])
+                trans_z.extend([z1, z2, None])
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=trans_x,
+                y=trans_y,
+                z=trans_z,
+                mode="lines",
+                line=dict(color="grey", width=1, dash="dot"),  # Thin dotted lines
+                name="Transfer (Penalty)",
+                hoverinfo="none",
+            )
+        )
+
+        # Part C: Draw Nodes (Stations)
+        node_x, node_y, node_z, node_text = [], [], [], []
+        for st, ln in self.routing_graph.nodes():
+            x, y = pos_2d[st]
+            z = line_to_z[ln]
+
+            node_x.append(x)
+            node_y.append(y)
+            node_z.append(z)
+            node_text.append(f"{st} ({ln})")
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=node_x,
+                y=node_y,
+                z=node_z,
+                mode="markers",
+                marker=dict(size=4, color="black"),
+                text=node_text,
+                name="Nodes",
+                hoverinfo="text",
+            )
+        )
+
+        # Layout
+        fig.update_layout(
+            title="BART State-Space Routing Graph (3D)",
+            scene=dict(
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                zaxis=dict(
+                    title="Line Layer",
+                    tickvals=list(line_to_z.values()),
+                    ticktext=list(line_to_z.keys()),
+                ),
             ),
+            margin=dict(l=0, r=0, b=0, t=40),
         )
         fig.show()
 
 
 if __name__ == "__main__":
     bart = BartNetwork()
-    bart.visualize()
+    bart.visualize_routing()

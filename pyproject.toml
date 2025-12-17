@@ -17,4 +17,5 @@ dependencies = [
     "pandas>=2.3.3",
     "plotly>=6.5.0",
     "ruff>=0.14.9",
+    "scipy>=1.16.3",
 ]

@@ -225,6 +225,16 @@ LINES = {
 MODEL_LINES = ["RED", "ORANGE", "YELLOW", "GREEN", "BLUE"]
 DIRS = ["FWD", "REV"]
 
+# Official BART colors
+LINE_COLORS = {
+    "RED": "#ED1C24",  # Richmond - Millbrae
+    "ORANGE": "#F7931D",  # Richmond - Berryessa
+    "YELLOW": "#FDB515",  # Antioch - SFO
+    "GREEN": "#4DB848",  # Berryessa - Daly City
+    "BLUE": "#00AEEF",  # Dublin/Pleasanton - Daly City
+    "OAK": "#A6A9AC",  # Beige (OAK Connector)
+}
+
 
 # 5. BASELINE / OPERATIONAL ASSUMPTIONS
 # Round Trip Times (Hours) - Hardcoded based on historical averages

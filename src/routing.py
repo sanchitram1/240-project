@@ -1,6 +1,5 @@
 import gzip
 import shutil
-import logging
 from collections import defaultdict
 
 import networkx as nx
@@ -169,7 +168,9 @@ def build_path_lookup(network: BartNetwork) -> dict[tuple[str, str], list[Segmen
 
                 # Step 5: Append to our dictionary
                 path_lookup[(origin, dest)] = segments
-                logger.debug(f"Path {origin}->{dest}: {len(segments)} segments, weight {min_weight}")
+                logger.debug(
+                    f"Path {origin}->{dest}: {len(segments)} segments, weight {min_weight}"
+                )
 
     logger.info(f"Path lookup complete: {len(path_lookup)} paths calculated")
     return path_lookup
@@ -260,7 +261,7 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     logger.debug("Phase 3: Routing demand to segments...")
     segment_demand = defaultdict(float)
     total_passengers = 0
-    
+
     for row in od_sums.itertuples():
         # skip same station exits (anomaly)
         if row.origin == row.dest:
@@ -278,6 +279,8 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
             logger.error(f"No shortest path found for {row.origin} -> {row.dest}")
             raise nx.NetworkXNoPath(f"No shortest path for {row.origin} -> {row.dest}")
 
-    logger.info(f"Segment demand calculation complete: {len(segment_demand)} segment-period pairs")
+    logger.info(
+        f"Segment demand calculation complete: {len(segment_demand)} segment-period pairs"
+    )
     logger.info(f"Total demand routed: {total_passengers:,.0f} passengers/hour")
     return dict(segment_demand)

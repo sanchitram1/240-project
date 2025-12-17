@@ -1,4 +1,3 @@
-import logging
 from collections import defaultdict
 
 import src.config as config
@@ -17,7 +16,7 @@ def print_schedule_table(schedule):
     Highlights (!) if the line is running at minimum allowed frequency.
     """
     logger.debug("Generating schedule report...")
-    
+
     if not schedule:
         logger.warning("No schedule to display.")
         return
@@ -69,7 +68,7 @@ def print_schedule_table(schedule):
                 cell_text = ", ".join(parts)
 
                 # CHECK: Is this the bare minimum frequency?
-                if int(total_freq) == int(config.MIN_FREQ):
+                if int(total_freq) == int(config.MIN_FREQ) and len(configs) == 1:
                     cell_text += " (!)"
                     if line not in min_freq_lines:
                         min_freq_lines.append(line)
@@ -83,7 +82,7 @@ def print_schedule_table(schedule):
         f"(!) = Service running at Policy Minimum ({config.MIN_FREQ} trains/hr). Demand did not justify this capacity."
     )
     print("\n")
-    
+
     if min_freq_lines:
         logger.debug(f"Lines at minimum frequency: {', '.join(min_freq_lines)}")
     logger.info("Schedule report complete")

@@ -6,9 +6,9 @@ import networkx as nx
 import pandas as pd
 import requests
 
-import config
-from network import BartNetwork, Segment
-from logging_config import setup_logger
+import src.config as config
+from src.network import BartNetwork, Segment
+from src.logging_config import setup_logger
 
 logger = setup_logger(__name__)
 

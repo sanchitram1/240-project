@@ -26,6 +26,22 @@ get left behind** and we use the **fewest possible number of cars**?
 2. There are 4 time periods $p \in P = \{\text{AM, PM, MID, EVE}\}$
 3. There are 7 possible train lengths $k \in K = \{3, 4, 5, 6, 7, 8, 9, 10\}$
 
+> [!note]
+> The time period definitions are
+> ```
+> PERIOD_TO_HOURS = {
+>    "AM": [6, 7, 8, 9],
+>    "MID": [10, 11, 12, 13, 14],
+>    "PM": [15, 16, 17, 18],
+>    "EVE": [19, 20, 21],
+> }
+> ```
+>
+> We don't specify Night hours because the demand during these hours is
+> so low that we can just run short trains with minimal frequency and not
+> worry about the consequences. The fleet constraint (specified below) 
+> will never be binding in this case, so we can ignore it
+
 ## Definitions
 
 1. **OD:** Origin-Destination. This is the way the demand data is given to us

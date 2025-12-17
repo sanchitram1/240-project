@@ -22,6 +22,9 @@ class Segment:
     def __repr__(self):
         return f"{self.u}->{self.v}"
 
+    def __eq__(self, value: object, /) -> bool:
+        return self.u == value.u and self.v == value.v
+
 
 class BartNetwork:
     """A object representing the BART network"""

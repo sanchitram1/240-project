@@ -12,11 +12,10 @@ OD_FILE_COLUMNS = ["date", "hour", "origin", "dest", "count"]
 
 # What year should we use?
 TARGET_YEAR = 2024
+OD_FILEPATH = DATA_DIR / OD_FILE_TEMPLATE.format(year=TARGET_YEAR)
 
 # In case we need to download it, here's where we get it from
 OD_URL_TEMPLATE = "https://afcweb.bart.gov/ridership/origin-destination/date-hour-soo-dest-{year}.csv.gz"
-
-
 # 2. TIME & SCOPE
 # We model 4 distinct periods.
 # The "Representative Hour" is used to scale hourly demand to the full period.

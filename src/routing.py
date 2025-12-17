@@ -203,7 +203,10 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
 
     print("Assigning demand to segments...")
     for row in od_sums.itertuples():
-        # get the segments for the origin destination pair
+        # skip same station exits (anomaly)
+        if row.origin == row.dest:
+            continue
+
         path_segments = path_lookup.get((row.origin, row.dest))
 
         if path_segments:
@@ -212,7 +215,65 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
                 segment_demand[(seg, row.period)] += row.passengers_per_hr
         else:
             # Handle edge case where no path found (shouldn't happen in valid graph)
-            raise nx.NetworkXNoPath("No path found when assigning demand to segments")
+            raise nx.NetworkXNoPath(f"No shortest path for {row.origin} -> {row.dest}")
 
     print(f"Routing complete. Mapped demand to {len(segment_demand)} segment-periods.")
     return dict(segment_demand)
+
+
+def main():
+    print("🚀 Starting Routing Test...\n")
+
+    # 1. Initialize the Map
+    print("1️⃣  Building Network Graph...")
+    bart = BartNetwork()
+    print(f"    - Nodes: {len(bart.graph.nodes)}")
+    print(f"    - Segments (Phys): {len(bart.graph.edges)}")
+    print(f"    - Routing Nodes: {len(bart.routing_graph.nodes)}")
+
+    # 2. Get the Data
+    print("\n2️⃣  Fetching Ridership Data...")
+    df = fetch_or_load_data()
+    print(f"    - Raw Rows: {len(df):,}")
+
+    # 3. Run the Routing Engine
+    print("\n3️⃣  Calculating Segment Demand (The Heavy Lift)...")
+    # This runs Dijkstra for every OD pair + aggregates sums
+    demand_map = calculate_segment_demand(bart, df)
+
+    # 4. Analyze Results
+    print(f"\n✅ Routing Complete! Mapped demand to {len(demand_map)} segment-periods.")
+
+    # Sort by highest passenger load
+    sorted_demand = sorted(demand_map.items(), key=lambda item: item[1], reverse=True)
+
+    print("\n🏆 TOP 20 MOST CROWDED SEGMENTS")
+    print("=" * 60)
+    print(f"{'Rank':<5} | {'Period':<6} | {'From':<6} -> {'To':<6} | {'Pax/Hr':>10}")
+    print("-" * 60)
+
+    for i, ((segment, period), load) in enumerate(sorted_demand[:20], 1):
+        print(
+            f"{i:<5} | {period:<6} | {segment.u:<6} -> {segment.v:<6} | {load:>10,.0f}"
+        )
+
+    print("=" * 60)
+
+    # Sanity Check: The "Transbay Tube" (West Oakland <-> Embarcadero)
+    # This is notoriously the busiest section. It should be near the top.
+    tube_demand = [
+        load
+        for (seg, per), load in demand_map.items()
+        if (seg.u == "WOAK" and seg.v == "EMBR" and per == "AM")
+    ]
+
+    if tube_demand:
+        print(f"\nSanity Check - WOAK->EMBR (AM): {tube_demand[0]:,.0f} pax/hr")
+    else:
+        print(
+            "\n⚠️ WARNING: No demand found for Transbay Tube (WOAK->EMBR) in AM. Check routing logic."
+        )
+
+
+if __name__ == "__main__":
+    main()

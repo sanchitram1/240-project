@@ -3,7 +3,8 @@ from pathlib import Path
 # 1. FILE PATHS & SYSTEM SETTINGS
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_DIR / "data"
-OD_FILEPATH = DATA_DIR / "date-hour-soo-dest-2025.csv"  # Updated to match your repo
+# NOTE: below is an option for local development, since the file is ~150 MB
+OD_FILEPATH = DATA_DIR / "date-hour-soo-dest-2025.csv"
 RANDOM_SEED = 222
 
 
@@ -29,7 +30,10 @@ MIN_FREQ = 2  # Max gap ~30 mins
 MAX_FREQ = 12  # Min gap ~5 mins
 
 # 4. NETWORK DEFINITIONS
-# Cost of transferring between lines (in "equivalent stops" units)
+# This part is used by routing.py to map the OD data into segment specific capacities
+# Since we're doing this dynamically (calculating shortest paths between stations,
+# accounting for transfers), we need to set the penalty for transfers
+# routing.py has more information about that
 TRANSFER_PENALTY_EDGES = 4
 STATIONS = [
     "16TH",
@@ -205,7 +209,7 @@ LINES = {
         "WDUB",
         "DUBL",
     ],
-    # OAK Shuttle is exogenous (handled separately) but part of the map
+    # OAK Shuttle is handled separately but part of the map so throwing it in
     "OAK": ["COLS", "OAKL"],
 }
 
@@ -216,6 +220,7 @@ DIRS = ["FWD", "REV"]
 
 # 5. BASELINE / OPERATIONAL ASSUMPTIONS
 # Round Trip Times (Hours) - Hardcoded based on historical averages
+# NOTE: we can validate this with data, but this is a decent starting point
 ROUND_TRIP_HOURS = {
     "YELLOW": 2.5,
     "RED": 2.4,

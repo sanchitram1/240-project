@@ -257,3 +257,15 @@ for ln in MODEL_LINES:
         BASELINE_FREQUENCIES[(ln, dr, "MID")] = 4 if ln == "YELLOW" else 3
         BASELINE_FREQUENCIES[(ln, dr, "PM")] = 6 if ln == "YELLOW" else 4
         BASELINE_FREQUENCIES[(ln, dr, "EVE")] = 2
+
+# ==============================
+# FUNCTIONS
+# ==============================
+
+
+def hours_to_periods():
+    hour_to_period = {}
+    for period, hours in PERIOD_TO_HOURS.items():
+        for h in hours:
+            hour_to_period[h] = period
+    return hour_to_period

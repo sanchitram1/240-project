@@ -173,11 +173,7 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     df = df[df["origin"].isin(valid_stations) & df["dest"].isin(valid_stations)]
 
     # Map Hours to Periods
-    # We create a reverse lookup: hour -> period
-    hour_to_period = {}
-    for period, hours in config.PERIOD_TO_HOURS.items():
-        for h in hours:
-            hour_to_period[h] = period
+    hour_to_period = config.hours_to_periods()
 
     # Filter for hours that exist in our definitions
     df = df[df["hour"].isin(hour_to_period.keys())].copy()
@@ -185,19 +181,16 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
 
     # 3. Aggregate OD Demand
     # We sum up all trips for (Origin, Dest, Period)
-    # Note: The raw data is usually "Total trips in this hour".
-    # Since our optimization period (e.g. AM) is 4 hours long,
-    # we need the "Average Hourly Demand" for that period?
-    # Or "Total Demand for the Period"?
-    # The constraint is: Capacity (cars/hr * trips/hr * hours) >= Demand (total passengers)
-    # usually LP is formulated in RATES (passengers per hour).
 
-    # Let's Calculate Average Hourly Demand for the period.
+    # NOTE: The raw data is usually "Total trips in this hour".
+    # Since our optimization period (e.g. AM) is 4 hours long,
+    # We need the "Average Hourly Demand" for that period.
+    # (e.g. if AM is 4 hours, and total count is 4000, rate is 1000/hr)
+
     # Group by O, D, Period -> Sum counts
     od_sums = df.groupby(["origin", "dest", "period"])["count"].sum().reset_index()
 
     # Now divide by number of hours in that period to get Rate
-    # (e.g. if AM is 4 hours, and total count is 4000, rate is 1000/hr)
     def get_period_hours(row):
         return len(config.PERIOD_TO_HOURS[row["period"]])
 
@@ -205,24 +198,21 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     od_sums["passengers_per_hr"] = od_sums["count"] / od_sums["hours_in_period"]
 
     # 4. Assign to Segments
+    # This is the meat of this function, but remarkably easy
     segment_demand = defaultdict(float)
 
     print("Assigning demand to segments...")
-    for _, row in od_sums.iterrows():
-        o, d = row["origin"], row["dest"]
-        period = row["period"]
-        demand = row["passengers_per_hr"]
-
-        # Get path
-        path_segments = path_lookup.get((o, d))
+    for row in od_sums.itertuples():
+        # get the segments for the origin destination pair
+        path_segments = path_lookup.get((row.origin, row.dest))
 
         if path_segments:
             for seg in path_segments:
-                # We key by (Segment, Period)
-                segment_demand[(seg, period)] += demand
+                # for each segment, increment the demand
+                segment_demand[(seg, row.period)] += row.passengers_per_hr
         else:
             # Handle edge case where no path found (shouldn't happen in valid graph)
-            pass
+            raise nx.NetworkXNoPath("No path found when assigning demand to segments")
 
     print(f"Routing complete. Mapped demand to {len(segment_demand)} segment-periods.")
     return dict(segment_demand)

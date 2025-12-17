@@ -137,6 +137,10 @@ class BartNetwork:
             unique_segs.update(seg_list)
         return list(unique_segs)
 
+    # ==============================
+    # VISUALIZE FUNCTIONS
+    # ==============================
+
     def visualize(self):
         """
         Interactive Plotly visualization of the network topology.
@@ -245,7 +249,7 @@ class BartNetwork:
 
             edge_x, edge_y, edge_z = [], [], []
 
-            # Actually, let's iterate the Routing Graph directly to be true to the data
+            # Iterate the Routing Graph directly to be true to the data
             # Filter edges where both nodes are on line 'ln'
             for u_node, v_node in self.routing_graph.edges():
                 u_st, u_ln = u_node

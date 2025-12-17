@@ -153,6 +153,63 @@ def build_path_lookup(network: BartNetwork) -> dict[tuple[str, str], list[Segmen
     return path_lookup
 
 
+def prepare_demand_data(df: pd.DataFrame, valid_stations: set) -> pd.DataFrame:
+    """
+    Cleans raw ridership data and converts it into an Average Hourly Demand rate
+    per Origin-Destination-Period tuple.
+
+    Logic:
+    0. Focus only on weekdays to find the maximum usage
+    1. Filter out stations not in our network.
+    2. Map raw hours (0-23) to our periods (AM, PM, OFF).
+    3. Normalize total counts by the number of days in the dataset.
+    4. Normalize by the duration of the period to get 'Passengers Per Hour'.
+    """
+    # 1. Convert date column to datetime objects (if not already)
+    df["date"] = pd.to_datetime(df["date"])
+
+    # 2. Filter for Weekdays ONLY (Monday=0, Sunday=6)
+    # We only care about Mon-Fri for Fleet Sizing
+    df_clean = df[df["date"].dt.dayofweek < 5].copy()
+
+    # 3. Filter Data (Keep only valid stations)
+    df_clean = df_clean[
+        df_clean["origin"].isin(valid_stations) & df_clean["dest"].isin(valid_stations)
+    ]
+    # 4. Map Hours to Periods
+    hour_to_period = config.hours_to_periods()
+
+    # Filter only for hours that exist in our defined periods
+    df_clean = df_clean[df_clean["hour"].isin(hour_to_period.keys())]
+    df_clean["period"] = df_clean["hour"].map(hour_to_period)
+
+    # 5. Identify Normalization Factor (The "Days" Fix)
+    # If the dataset covers 3 months (90 days), we must divide the total sum by 90.
+    num_days = df_clean["date"].nunique()
+    if num_days == 0:
+        raise ValueError("Dataset contains no valid dates after filtering!")
+
+    # 6. Aggregate Total Counts
+    # Sum up every single trip in the history of the file for this (O, D, Period)
+    od_sums = (
+        df_clean.groupby(["origin", "dest", "period"])["count"].sum().reset_index()
+    )
+
+    # 7. Calculate Hourly Rate
+    def get_period_hours(row):
+        return len(config.PERIOD_TO_HOURS[row["period"]])
+
+    # First, get the number of hours in that particular period
+    od_sums["hours_in_period"] = od_sums.apply(get_period_hours, axis=1)
+
+    # Then, normalize it by the number of hours and the number of days
+    od_sums["passengers_per_hr"] = od_sums["count"] / (
+        od_sums["hours_in_period"] * num_days
+    )
+
+    return od_sums
+
+
 def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     """
     Main driver function.
@@ -167,41 +224,12 @@ def calculate_segment_demand(network: BartNetwork, df: pd.DataFrame) -> dict:
     # 1. Pre-calculate paths
     path_lookup = build_path_lookup(network)
 
-    # 2. Filter Data
-    # Only keep rows where origin/dest are in our station list
+    # 2. Get data as Origin-Destination total demand
     valid_stations = network.station_set
-    df = df[df["origin"].isin(valid_stations) & df["dest"].isin(valid_stations)]
+    od_sums = prepare_demand_data(df, valid_stations)
 
-    # Map Hours to Periods
-    hour_to_period = config.hours_to_periods()
-
-    # Filter for hours that exist in our definitions
-    df = df[df["hour"].isin(hour_to_period.keys())].copy()
-    df["period"] = df["hour"].map(hour_to_period)
-
-    # 3. Aggregate OD Demand
-    # We sum up all trips for (Origin, Dest, Period)
-
-    # NOTE: The raw data is usually "Total trips in this hour".
-    # Since our optimization period (e.g. AM) is 4 hours long,
-    # We need the "Average Hourly Demand" for that period.
-    # (e.g. if AM is 4 hours, and total count is 4000, rate is 1000/hr)
-
-    # Group by O, D, Period -> Sum counts
-    od_sums = df.groupby(["origin", "dest", "period"])["count"].sum().reset_index()
-
-    # Now divide by number of hours in that period to get Rate
-    def get_period_hours(row):
-        return len(config.PERIOD_TO_HOURS[row["period"]])
-
-    od_sums["hours_in_period"] = od_sums.apply(get_period_hours, axis=1)
-    od_sums["passengers_per_hr"] = od_sums["count"] / od_sums["hours_in_period"]
-
-    # 4. Assign to Segments
-    # This is the meat of this function, but remarkably easy
+    # 3. Convert OD to Segment specific demand
     segment_demand = defaultdict(float)
-
-    print("Assigning demand to segments...")
     for row in od_sums.itertuples():
         # skip same station exits (anomaly)
         if row.origin == row.dest:
@@ -258,21 +286,6 @@ def main():
         )
 
     print("=" * 60)
-
-    # Sanity Check: The "Transbay Tube" (West Oakland <-> Embarcadero)
-    # This is notoriously the busiest section. It should be near the top.
-    tube_demand = [
-        load
-        for (seg, per), load in demand_map.items()
-        if (seg.u == "WOAK" and seg.v == "EMBR" and per == "AM")
-    ]
-
-    if tube_demand:
-        print(f"\nSanity Check - WOAK->EMBR (AM): {tube_demand[0]:,.0f} pax/hr")
-    else:
-        print(
-            "\n⚠️ WARNING: No demand found for Transbay Tube (WOAK->EMBR) in AM. Check routing logic."
-        )
 
 
 if __name__ == "__main__":

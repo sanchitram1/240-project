@@ -2,10 +2,18 @@ from pathlib import Path
 
 # 1. FILE PATHS & SYSTEM SETTINGS
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_DIR / "data"
-# NOTE: below is an option for local development, since the file is ~150 MB
-OD_FILEPATH = DATA_DIR / "date-hour-soo-dest-2025.csv"
 RANDOM_SEED = 222
+
+# NOTE: below is an option for local development, since the file is ~150 MB
+DATA_DIR = PROJECT_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
+OD_FILE_TEMPLATE = "date-hour-soo-dest-{year}.csv.gz"
+
+# What year should we use?
+TARGET_YEAR = 2024
+
+# In case we need to download it, here's where we get it from
+OD_URL_TEMPLATE = "https://afcweb.bart.gov/ridership/origin-destination/date-hour-soo-dest-{year}.csv.gz"
 
 
 # 2. TIME & SCOPE

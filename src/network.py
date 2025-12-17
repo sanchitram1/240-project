@@ -1,8 +1,26 @@
 from collections import defaultdict
+from dataclasses import dataclass
 
 import networkx as nx
+import plotly.graph_objects as go
 
 import config
+
+
+# Use dataclasses to represent reused concepts in the code
+@dataclass(frozen=True)
+class LineDirection:
+    line: str
+    direction: str  # "FWD" or "REV"
+
+
+@dataclass(frozen=True)
+class Segment:
+    u: str
+    v: str
+
+    def __repr__(self):
+        return f"{self.u}->{self.v}"
 
 
 class BartNetwork:
@@ -24,13 +42,10 @@ class BartNetwork:
 
     def _build_physical_graph(self) -> nx.Graph:
         """Builds a simple undirected graph of the BART physical track.
+        Edges store which lines run on them: {'lines': {'RED', 'YELLOW'}}
 
-        The physical graph is just the simple BART map, with stations as nodes, and
-        edges as segments. Instead of storing whether a station belongs to multiple
-        lines or not, it stores whether the SEGMENT belongs to multiple lines:
-
-        `(MCAR, 19TH, lines=["RED", "YELLOW", "ORANGE"])` implies that the segment from
-        Macarthur to 19th St has three possible lines - red, yellow, and orange.
+        E.g.: `(MCAR, 19TH, lines=["RED", "YELLOW", "ORANGE"])` implies that the segment
+        from Macarthur to 19th St has three possible lines - red, yellow, and orange.
         """
         G = nx.Graph()
 
@@ -50,8 +65,8 @@ class BartNetwork:
         return G
 
     def _build_routing_graph(self) -> nx.DiGraph:
-        """
-        Builds a directed graph where nodes are (Station, Line).
+        """Builds a directed graph where nodes are (Station, Line).
+        Edges allow travel (cost=1) or transfers (cost=PENALTY).
 
         The routing graph represents all the possible travel options. Suppose you
         arrived to Macarthur from Red, that means you are in (MCAR, RED). You could move
@@ -91,30 +106,99 @@ class BartNetwork:
 
         return G
 
-    def _get_segments_by_line(self) -> dict[tuple[str, str], list[tuple[str, str]]]:
+    def _get_segments_by_line(self) -> dict[LineDirection, list[Segment]]:
         """
-        Returns a dict: segments[(line, dir)] = [(u,v), (v,w)...]
-        Used by the optimization model to know which segments belong to 'RED FWD'.
+        Returns a structured lookup of which segments belong to which line/direction.
         """
         segments = {}
         for ln, seq in self.lines.items():
             if ln not in config.MODEL_LINES:
                 continue
 
-            # FWD direction (Order defined in config)
-            fwd_segs = [(seq[i], seq[i + 1]) for i in range(len(seq) - 1)]
-            segments[(ln, "FWD")] = fwd_segs
+            # FWD direction
+            key_fwd = LineDirection(line=ln, direction="FWD")
+            segments[key_fwd] = [
+                Segment(seq[i], seq[i + 1]) for i in range(len(seq) - 1)
+            ]
 
-            # REV direction (Reverse order)
+            # REV direction
             rev_seq = seq[::-1]
-            rev_segs = [(rev_seq[i], rev_seq[i + 1]) for i in range(len(rev_seq) - 1)]
-            segments[(ln, "REV")] = rev_segs
+            key_rev = LineDirection(line=ln, direction="REV")
+            segments[key_rev] = [
+                Segment(rev_seq[i], rev_seq[i + 1]) for i in range(len(rev_seq) - 1)
+            ]
 
         return segments
 
-    def get_all_segments(self) -> list[tuple[str, str]]:
+    def get_all_segments(self) -> list[Segment]:
         """Returns a list of all unique directed edges (u,v) in the system."""
         unique_segs = set()
-        for segs in self.segments_by_line.values():
-            unique_segs.update(segs)
+        for seg_list in self.segments_by_line.values():
+            unique_segs.update(seg_list)
         return list(unique_segs)
+
+    # TODO: improve this, ideally in a way that renders it consistently with BART's
+    # actual map, but at the very least in a way that leads to viewing the lines without
+    # any unnecessary overlaps
+    def visualize(self):
+        """Interactive Plotly visualization of the network topology."""
+        G = self.graph
+        # Use spring layout since we don't have lat/lon
+        pos = nx.spring_layout(G, seed=42, k=0.5)
+
+        edge_x = []
+        edge_y = []
+        for edge in G.edges():
+            x0, y0 = pos[edge[0]]
+            x1, y1 = pos[edge[1]]
+            edge_x.extend([x0, x1, None])
+            edge_y.extend([y0, y1, None])
+
+        edge_trace = go.Scatter(
+            x=edge_x,
+            y=edge_y,
+            line=dict(width=1, color="#888"),
+            hoverinfo="none",
+            mode="lines",
+        )
+
+        node_x = []
+        node_y = []
+        node_text = []
+        for node in G.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            # Count how many lines serve this station
+            lines = G.edges(node, data="lines")
+            # Just a rough heuristic for size/color
+            node_text.append(f"{node}")
+
+        node_trace = go.Scatter(
+            x=node_x,
+            y=node_y,
+            mode="markers+text",
+            text=node_text,
+            textposition="top center",
+            hoverinfo="text",
+            marker=dict(showscale=False, color="skyblue", size=15, line_width=2),
+        )
+
+        fig = go.Figure(
+            data=[edge_trace, node_trace],
+            layout=go.Layout(
+                title="BART Network Topology",
+                # font_size=16,
+                showlegend=False,
+                hovermode="closest",
+                margin=dict(b=20, l=5, r=5, t=40),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            ),
+        )
+        fig.show()
+
+
+if __name__ == "__main__":
+    bart = BartNetwork()
+    bart.visualize()

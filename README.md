@@ -1,6 +1,19 @@
 # BART fleet-aware train length and frequency planning
 
-## Overview
+## Getting Started
+
+1. Install [`uv`](https://astral.sh/uv)
+2. Run `uv sync` to get all the dependencies
+
+## Running specific files
+
+Suppose we want to test the visualization of the network:
+
+```bash
+uv run src/network.py
+```
+
+## The Problem
 
 Let's put ourselves in the shoes of the "BART Manager". Suppose this individual has only
 two levers to pull and adjust the BART system:

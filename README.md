@@ -1,5 +1,8 @@
 # BART fleet-aware train length and frequency planning
 
+[![Tests Passing](https://img.shields.io/badge/tests-54%20passing-green)
+](https://github.com/sanchitram1/240-project/actions)
+
 ## Getting Started
 
 1. Install [`uv`](https://astral.sh/uv)

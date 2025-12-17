@@ -6,14 +6,7 @@ import config
 
 
 class BartNetwork:
-    """A object representing the BART network
-
-    It's easier to just encapsulate this in its own class, otherwise
-    we'll have a bunch of functions floating around about tweaking the graph,
-    that's why we're making it here
-
-    It imports stations and lines from config and accordingly creates
-    the map of BART"""
+    """A object representing the BART network"""
 
     def __init__(self):
         self.stations = config.STATIONS
@@ -24,16 +17,24 @@ class BartNetwork:
         self.graph = self._build_physical_graph()
         self.routing_graph = self._build_routing_graph()
 
-        # Pre-calculate directed segments for the optimizer
+        # segments_by_line is a useful lookup dictionary, so we can ask the question
+        # "which segments belong to RED FWD?" and we get all segments involved in the
+        # forward direction for the red line
         self.segments_by_line = self._get_segments_by_line()
 
     def _build_physical_graph(self) -> nx.Graph:
         """Builds a simple undirected graph of the BART physical track.
 
-        It iterates through the LINES structure from config, and adds segments to the
-        graph, with an edge label specifying the line (Red, Yellow) to that edge
+        The physical graph is just the simple BART map, with stations as nodes, and
+        edges as segments. Instead of storing whether a station belongs to multiple
+        lines or not, it stores whether the SEGMENT belongs to multiple lines:
+
+        `(MCAR, 19TH, lines=["RED", "YELLOW", "ORANGE"])` implies that the segment from
+        Macarthur to 19th St has three possible lines - red, yellow, and orange.
         """
         G = nx.Graph()
+
+        # iterate through all the LINES in config
         for ln, seq in self.lines.items():
             for i in range(len(seq) - 1):
                 # pick out the two consecutive stations in this line
@@ -41,18 +42,25 @@ class BartNetwork:
 
                 if G.has_edge(u, v):
                     # if the graph already has this edge, that means this segment
-                    # exists on a different line as well – we should capture that
+                    # exists on a different line as well – capture that
                     G[u][v]["lines"].add(ln)
                 else:
                     # if not, then add this edge and line to the graph
                     G.add_edge(u, v, lines={ln}, weight=1)
         return G
 
-    def _build_routing_graph(self):
+    def _build_routing_graph(self) -> nx.DiGraph:
         """
         Builds a directed graph where nodes are (Station, Line).
-        Edges between (Station, LineA) and (Station, LineB) have
-        high weight (transfer penalty).
+
+        The routing graph represents all the possible travel options. Suppose you
+        arrived to Macarthur from Red, that means you are in (MCAR, RED). You could move
+        to (MCAR, YELLOW), and then board a yellow line train to your next destination.
+        The routing graph calculates that transfer as an additional step.
+
+        Intuitively, the routing graph flattens the structure of graph – the edge labels
+        `lines` from the physical graph are flattened into separate nodes in the routing
+        graph
         """
         G = nx.DiGraph()
 
@@ -83,7 +91,7 @@ class BartNetwork:
 
         return G
 
-    def _get_segments_by_line(self) -> dict[tuple[str, str], list[str]]:
+    def _get_segments_by_line(self) -> dict[tuple[str, str], list[tuple[str, str]]]:
         """
         Returns a dict: segments[(line, dir)] = [(u,v), (v,w)...]
         Used by the optimization model to know which segments belong to 'RED FWD'.
@@ -104,7 +112,7 @@ class BartNetwork:
 
         return segments
 
-    def get_all_segments(self):
+    def get_all_segments(self) -> list[tuple[str, str]]:
         """Returns a list of all unique directed edges (u,v) in the system."""
         unique_segs = set()
         for segs in self.segments_by_line.values():
